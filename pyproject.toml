@@ -1,0 +1,10 @@
+[project]
+name = "create-monorepo"
+version = "0.1.0"
+description = "CLI tool that scaffolds a FastAPI + Next.js monorepo in a single command."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+create-monorepo = "create_monorepo:main"
