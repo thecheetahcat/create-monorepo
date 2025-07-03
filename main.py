@@ -13,11 +13,9 @@ from pathlib import Path
 
 
 class MonorepoSetup:
-    def __init__(
-        self, project_name, base_path=None
-    ):
+    def __init__(self, project_name, base_path=None):
         self.project_name = project_name
-        
+
         # Determine base path with fallback hierarchy
         if base_path:
             # Use explicitly provided path
@@ -28,7 +26,7 @@ class MonorepoSetup:
         else:
             # Use sensible default: ~/Projects
             self.base_path = Path.home() / "Projects"
-        
+
         self.project_path = self.base_path / project_name
 
     def run_command(self, command, cwd=None, shell=True, check=True):
