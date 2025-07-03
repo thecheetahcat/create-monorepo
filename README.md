@@ -59,7 +59,7 @@ By default, `create-monorepo` will create projects in `~/Projects`. You can cust
 2. **Environment variable** (persistent):
    ```bash
    # Add to ~/.zshrc or ~/.bashrc
-   export CREATE_MONOREPO_BASE_PATH="$HOME/Documents/PythonProjects"
+   export MONOREPO_BASE_PATH="$HOME/Documents/PythonProjects"
    
    # Then use normally
    create-monorepo my-project
