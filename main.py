@@ -5,6 +5,7 @@ Automatically creates a new monorepo with backend (Python/UV) and frontend (Next
 """
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -13,10 +14,21 @@ from pathlib import Path
 
 class MonorepoSetup:
     def __init__(
-        self, project_name, base_path="/Users/leomartinez/Documents/PythonProjects"
+        self, project_name, base_path=None
     ):
         self.project_name = project_name
-        self.base_path = Path(base_path)
+        
+        # Determine base path with fallback hierarchy
+        if base_path:
+            # Use explicitly provided path
+            self.base_path = Path(base_path)
+        elif os.environ.get("MONOREPO_BASE_PATH"):
+            # Use environment variable if set
+            self.base_path = Path(os.environ["MONOREPO_BASE_PATH"])
+        else:
+            # Use sensible default: ~/Projects
+            self.base_path = Path.home() / "Projects"
+        
         self.project_path = self.base_path / project_name
 
     def run_command(self, command, cwd=None, shell=True, check=True):
@@ -58,6 +70,11 @@ class MonorepoSetup:
         """Run the complete monorepo setup"""
         print(f"\n🚀 Setting up monorepo: {self.project_name}")
         print(f"📍 Location: {self.project_path}\n")
+
+        # Ensure base path exists
+        if not self.base_path.exists():
+            print(f"📁 Creating base directory: {self.base_path}")
+            self.base_path.mkdir(parents=True, exist_ok=True)
 
         # Check if directory already exists
         if self.project_path.exists():
@@ -548,8 +565,8 @@ def main():
     parser.add_argument("project_name", help="Name of the project directory to create")
     parser.add_argument(
         "--base-path",
-        default="/Users/leomartinez/Documents/PythonProjects",
-        help="Base path where the project will be created (default: %(default)s)",
+        default=None,
+        help="Base path where the project will be created (default: $MONOREPO_BASE_PATH or ~/Projects)",
     )
 
     args = parser.parse_args()

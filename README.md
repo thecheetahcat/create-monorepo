@@ -45,10 +45,35 @@ create-monorepo --help
 
 ---
 
+## Configuration
+
+### Default Base Path
+
+By default, `create-monorepo` will create projects in `~/Projects`. You can customize this in three ways:
+
+1. **Command line flag** (highest priority):
+   ```bash
+   create-monorepo my-project --base-path ~/code
+   ```
+
+2. **Environment variable** (persistent):
+   ```bash
+   # Add to ~/.zshrc or ~/.bashrc
+   export CREATE_MONOREPO_BASE_PATH="$HOME/Documents/PythonProjects"
+   
+   # Then use normally
+   create-monorepo my-project
+   ```
+
+3. **Default** (lowest priority):
+   - If no flag or environment variable is set, defaults to `~/Projects`
+
+---
+
 ## Usage
 
 ```bash
-# create a new project directory under ~/Path/To/PythonProjects
+# create a new project directory under ~/Projects (or your configured base path)
 create-monorepo my-awesome-project
 
 # specify a custom base path
