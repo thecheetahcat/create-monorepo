@@ -889,7 +889,7 @@ npm install -D package-name      # Development
 ```
 
 ### Create git repository
-```base
+```bash
 `gh auth switch`  # switch the right account
 git config user.name "your-user-name"
 git config user.email "your-email"
