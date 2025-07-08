@@ -887,6 +887,17 @@ cd frontend
 npm install package-name         # Production
 npm install -D package-name      # Development
 ```
+
+### Create git repository
+```base
+`gh auth switch`  # switch the right account
+git config user.name "your-user-name"
+git config user.email "your-email"
+git add .
+git commit -m "initial commit"
+gh repo create repo-name --public/private  # public or private
+git remote add origin git@host:user-name/repo-name.git
+git push -u origin master
 """
         self.create_file("README.md", readme_content)
 
