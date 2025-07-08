@@ -372,6 +372,13 @@ source .venv/bin/activate  # Unix/macOS
 uv sync --dev
 ```
 
+## Environment variables
+Copy `.env.example` to `.env` and fill in your Supabase credentials.
+
+```bash
+cp .env.example .env
+```
+
 ## Development
 ```bash
 # Run the development server
@@ -388,8 +395,16 @@ python -m uvicorn app.main:app --reload --port 8000
 backend/
 ├── src/
 │   └── app/
+│       ├── core/
+│       │   └── config.py
+│       ├── database/
+│       │   ├── alembic/
+│       │   ├── models/
+│       │   │   └── base.py
+│       │   └── session.py
 │       ├── __init__.py
 │       └── main.py
+├── .env.example
 ├── .venv/
 ├── pyproject.toml
 └── README.md
@@ -418,8 +433,328 @@ uv add --dev package-name
         # Sync dependencies
         self.run_command("uv sync --dev", cwd=backend_path)
 
-        # Add FastAPI and uvicorn
-        self.run_command("uv add fastapi uvicorn", cwd=backend_path)
+        # --------------------------------------------------
+        # Add backend dependencies (FastAPI and uvicorn, DB, migrations, env management)
+        self.run_command(
+            "uv add fastapi uvicorn alembic sqlalchemy psycopg psycopg2 pydantic-settings python-dotenv supabase",
+            cwd=backend_path,
+        )
+
+        # Install newly added dependencies into the virtual-env
+        self.run_command("uv sync --dev", cwd=backend_path)
+
+        # --------------------------------------------------
+        # Create core configuration package
+        core_dir = backend_path / "src" / "app" / "core"
+        core_dir.mkdir(parents=True, exist_ok=True)
+        self.create_file("backend/src/app/core/__init__.py", "")
+
+        core_config = """from urllib.parse import quote_plus
+
+from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from supabase import create_client
+
+
+class Settings(BaseSettings):
+    # supabase
+    DB_USER: str = "postgres"
+    DB_NAME: str = "postgres"
+    DB_PORT: str = "5432"
+    DEV_LOGS: bool = False
+    SUPABASE_DB_PASSWORD: str
+    SUPABASE_PROJECT_ID: str
+
+    # supabase storage
+    SUPABASE_BUCKET: str = "your-bucket-name"
+    SUPABASE_URL: str
+    SUPABASE_KEY: str
+
+    @property
+    def supabase_connection_string(self):
+        # normal url encoding (runtime usage)
+        encoded_password = quote_plus(self.SUPABASE_DB_PASSWORD)
+        return (
+            f"postgresql://{self.DB_USER}.{self.SUPABASE_PROJECT_ID}:{encoded_password}"
+            f"@aws-0-us-east-2.pooler.supabase.com:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+    @property
+    def async_supabase_connection_string(self):
+        return self.supabase_connection_string.replace(
+            "postgresql://", "postgresql+psycopg://"
+        )
+
+    @property
+    def supabase_connection_string_alembic(self):
+        # alembic-compatible connection string with '%%'
+        encoded_password = quote_plus(self.SUPABASE_DB_PASSWORD).replace('%', '%%')
+        return (
+            f"postgresql://{self.DB_USER}.{self.SUPABASE_PROJECT_ID}:{encoded_password}"
+            f"@aws-0-us-east-2.pooler.supabase.com:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+    model_config = SettingsConfigDict(
+        env_file='.env',
+        case_sensitive=True,
+    )
+
+
+load_dotenv()
+
+settings = Settings()
+
+sb_client = create_client(
+    settings.SUPABASE_URL,
+    settings.SUPABASE_KEY,
+)
+"""
+        self.create_file("backend/src/app/core/config.py", core_config)
+
+        # --------------------------------------------------
+        # Environment example file
+        env_example = """# supabase
+SUPABASE_DB_PASSWORD=your-password
+SUPABASE_PROJECT_ID=your-project-id
+SUPABASE_URL=your-url
+SUPABASE_KEY=your-key
+"""
+        self.create_file("backend/.env.example", env_example)
+
+        # --------------------------------------------------
+        # Database package setup
+        db_dir = backend_path / "src" / "app" / "database"
+        models_dir = db_dir / "models"
+        models_dir.mkdir(parents=True, exist_ok=True)
+
+        self.create_file("backend/src/app/database/__init__.py", "")
+
+        self.create_file(
+            "backend/src/app/database/models/__init__.py",
+            'from .base import Base\n\n__all__ = ["Base"]\n',
+        )
+
+        base_model = """from sqlalchemy import inspect
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Mixins:
+    def to_dict(self):
+        mapper = inspect(self).mapper
+        return {attr.key: getattr(self, attr.key) for attr in mapper.column_attrs}
+
+
+class Base(Mixins, DeclarativeBase):
+    pass
+"""
+        self.create_file("backend/src/app/database/models/base.py", base_model)
+
+        session_py = """from contextlib import asynccontextmanager, contextmanager
+from typing import Any, AsyncGenerator, Generator
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.core.config import settings
+
+# synchronous session
+engine = create_engine(settings.supabase_connection_string, echo=settings.DEV_LOGS)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# asynchronous session
+async_engine = create_async_engine(
+    settings.async_supabase_connection_string, echo=settings.DEV_LOGS
+)
+AsyncSessionLocal = sessionmaker(
+    bind=async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+
+@contextmanager
+def get_session() -> Generator[Any, Any, Any]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@asynccontextmanager
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as adb:
+        try:
+            yield adb
+        finally:
+            await adb.close()
+
+
+class BaseSession:
+    def __init__(self):
+        self.session = None
+        self._session_cm = None
+
+    def __enter__(self):
+        self._session_cm = get_session()
+        self.session = self._session_cm.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            # log or handle the exception here
+            pass
+        else:
+            self.session.commit()
+        return self._session_cm.__exit__(exc_type, exc_val, exc_tb)
+"""
+        self.create_file("backend/src/app/database/session.py", session_py)
+
+        db_readme = """# Database & Migrations Guide
+
+This directory ships **ready-to-use** tooling for working with a Postgres (Supabase) database via SQLAlchemy & Alembic.
+
+## What you already have
+
+```
+database/
+├── alembic/            # Alembic already initialised for versioned migrations
+│   ├── env.py          # pre-configured to use our Settings + Base metadata
+│   └── versions/       # (empty) place where revision files will be generated
+├── models/
+│   └── base.py         # Declarative SQLAlchemy Base (+ to_dict mixin)
+├── session.py          # Sync & Async session helpers bound to Supabase
+└── README.md           # (this file)
+```
+
+## First-time setup
+
+1. `cd backend && source .venv/bin/activate`
+2. Ensure `.env` contains valid Supabase credentials (see `.env.example`).
+3. Upgrade dependencies if you add new DB libraries: `uv sync --dev`.
+
+## Creating migrations
+
+```bash
+# Navigate into the database directory so Alembic picks up the right ini file
+cd src/app/database
+
+# Generate a new migration with autogenerate
+alembic revision --autogenerate -m "create users table"
+
+# OR start a blank migration
+alembic revision -m "custom changes"
+```
+
+Alembic will compare the models imported via `Base.metadata` (all models that subclass `Base`) against the current DB schema and emit the SQL needed.
+
+## Applying / rolling migrations
+
+```bash
+# Upgrade to the latest version
+alembic upgrade head
+
+# Downgrade one revision
+alembic downgrade -1
+```
+
+## Tips
+
+* The engine & session are configured in `session.py`; adjust logging or isolation as needed.
+* Use the **async** helpers for async frameworks (e.g. FastAPI) and the sync helpers for scripts.
+* If autogenerate misses changes, check that your new model modules are imported somewhere before Alembic runs (e.g. inside `database/models/__init__.py`).
+"""
+        self.create_file("backend/src/app/database/README.md", db_readme)
+
+        # --------------------------------------------------
+        # Alembic initialization and configuration
+        alembic_exe = backend_path / ".venv" / "bin" / "alembic"
+        self.run_command(f"{alembic_exe} init alembic", cwd=db_dir)
+
+        alembic_env = """from logging.config import fileConfig
+
+from alembic import context
+from app.core.config import settings
+from app.database.models.base import Base
+from sqlalchemy import engine_from_config, pool
+
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
+config = context.config
+
+# Override the sqlalchemy.url setting with an environment variable value
+DATABASE_URL = settings.supabase_connection_string_alembic
+
+if DATABASE_URL:
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
+else:
+    raise Exception("DATABASE_URL environment variable is not set.")
+
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# add your model's MetaData object here
+# for 'autogenerate' support
+# from myapp import mymodel
+# target_metadata = mymodel.Base.metadata
+target_metadata = Base.metadata
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
+
+def run_migrations_offline() -> None:
+    '''Run migrations in 'offline' mode.
+
+    This configures the context with just a URL
+    and not an Engine, though an Engine is acceptable
+    here as well.  By skipping the Engine creation
+    we don't even need a DBAPI to be available.
+
+    Calls to context.execute() here emit the given string to the
+    script output.
+
+    '''
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+def run_migrations_online() -> None:
+    '''Run migrations in 'online' mode.
+
+    In this scenario we need to create an Engine
+    and associate a connection with the context.
+
+    '''
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+"""
+        self.create_file("backend/src/app/database/alembic/env.py", alembic_env)
 
     def setup_frontend(self):
         """Setup frontend with Next.js"""
@@ -512,8 +847,8 @@ uv add --dev package-name
         readme_content = f"""# {self.project_name}
 
 ## Structure
-- `/backend` - Python backend service (FastAPI)
-- `/frontend` - Frontend application (Next.js/React)
+- [Backend](backend/README.md) - Python backend service (FastAPI)
+- [Frontend](frontend/README.md) - Frontend application (Next.js/React)
 
 ## Getting Started
 
