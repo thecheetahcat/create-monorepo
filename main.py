@@ -898,6 +898,7 @@ git commit -m "initial commit"
 gh repo create repo-name --public/private  # public or private
 git remote add origin git@host:user-name/repo-name.git
 git push -u origin master
+```
 """
         self.create_file("README.md", readme_content)
 
