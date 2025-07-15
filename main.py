@@ -373,7 +373,7 @@ uv sync --dev
 ```
 
 ## Environment variables
-Copy `.env.example` to `.env` and fill in your Supabase credentials.
+Copy `.env.example` to `.env` and fill in your credentials.
 
 ```bash
 cp .env.example .env
@@ -467,8 +467,11 @@ class Settings(BaseSettings):
 
     # supabase storage
     SUPABASE_BUCKET: str = "your-bucket-name"
+
+    # supabase auth
     SUPABASE_URL: str
     SUPABASE_KEY: str
+    SUPABASE_JWT: str
 
     @property
     def supabase_connection_string(self):
@@ -518,6 +521,7 @@ SUPABASE_DB_PASSWORD=your-password
 SUPABASE_PROJECT_ID=your-project-id
 SUPABASE_URL=your-url
 SUPABASE_KEY=your-key
+SUPABASE_JWT=your-jwt
 """
         self.create_file("backend/.env.example", env_example)
 
@@ -549,28 +553,101 @@ class Base(Mixins, DeclarativeBase):
 """
         self.create_file("backend/src/app/database/models/base.py", base_model)
 
-        session_py = """from contextlib import asynccontextmanager, contextmanager
+        session_py = """import asyncio
+import functools
+import logging
+from contextlib import asynccontextmanager, contextmanager
 from typing import Any, AsyncGenerator, Generator
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import DisconnectionError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
+
+# connection pool configuration
+CONNECTION_POOL_CONFIG = {
+    "echo": settings.DEV_LOGS,
+    "pool_size": 10,
+    "max_overflow": 20,
+    "pool_timeout": 30,
+    "pool_recycle": 3600,
+    "pool_pre_ping": True,
+}
+
 # synchronous session
-engine = create_engine(settings.supabase_connection_string, echo=settings.DEV_LOGS)
+engine = create_engine(settings.supabase_connection_string, **CONNECTION_POOL_CONFIG)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # asynchronous session
 async_engine = create_async_engine(
-    settings.async_supabase_connection_string, echo=settings.DEV_LOGS
+    settings.async_supabase_connection_string, **CONNECTION_POOL_CONFIG
 )
 AsyncSessionLocal = sessionmaker(
     bind=async_engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+
+def retry_db_operation(max_retries: int = 3, delay: float = 1.0):
+    '''
+    Decorator to retry database operations on connection failures.
+
+    Args:
+        max_retries: Maximum number of retry attempts
+        delay: Delay between retries in seconds
+    '''
+
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except (OperationalError, DisconnectionError) as e:
+                    last_exception = e
+                    error_msg = str(e).lower()
+
+                    # check if it's a connection-related error
+                    if any(
+                        phrase in error_msg
+                        for phrase in [
+                            "server closed the connection",
+                            "connection closed",
+                            "connection was closed",
+                            "connection terminated",
+                            "connection lost",
+                            "connection reset",
+                        ]
+                    ):
+                        if attempt < max_retries:
+                            logger.warning(
+                                f"Database connection failed (attempt {attempt + 1}/{max_retries + 1}): {e}"
+                            )
+                            await asyncio.sleep(
+                                delay * (attempt + 1)
+                            )  # exponential backoff
+                            continue
+
+                    # for non-connection errors or max retries reached
+                    raise
+                except Exception:
+                    # for non-connection exceptions, don't retry
+                    raise
+
+            # if we get here, all retries failed
+            raise last_exception
+
+        return wrapper
+
+    return decorator
 
 
 @contextmanager
@@ -591,14 +668,35 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             await adb.close()
 
 
+async def get_async_session_dep() -> AsyncGenerator[AsyncSession, None]:
+    '''
+    FastAPI dependency for async database session.
+
+    Usage:
+        @router.get("/endpoint")
+        async def my_endpoint(session: AsyncSession = Depends(get_async_session_dep)):
+            # Use session here
+            pass
+    '''
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception as e:
+            logger.error(f"Database session error: {e}")
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
 class BaseSession:
     def __init__(self):
         self.session = None
-        self._session_cm = None
+        self._session = None
 
     def __enter__(self):
-        self._session_cm = get_session()
-        self.session = self._session_cm.__enter__()
+        self._session = get_session()
+        self.session = self._session.__enter__()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -607,6 +705,7 @@ class BaseSession:
             pass
         else:
             self.session.commit()
+        self.session.close()
         return self._session_cm.__exit__(exc_type, exc_val, exc_tb)
 """
         self.create_file("backend/src/app/database/session.py", session_py)
@@ -707,6 +806,33 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+
+def include_object(object, name, type_, reflected, compare_to):
+    '''Filter function to exclude certain tables from Alembic migrations.
+
+    This excludes Supabase-managed tables that we don't want to manage
+    with our SQLAlchemy models.
+
+    '''
+    # Tables to exclude from migrations (Supabase managed)
+    excluded_tables = {
+        "profiles",  # Supabase user profiles
+        # Add other Supabase tables here if needed
+    }
+
+    # Exclude tables in the 'auth' schema (Supabase auth tables)
+    if type_ == "table" and hasattr(object, "schema"):
+        if object.schema == "auth":
+            return False
+
+    # Exclude specific tables by name
+    if type_ == "table" and name in excluded_tables:
+        return False
+
+    # Include everything else
+    return True
+
+
 def run_migrations_offline() -> None:
     '''Run migrations in 'offline' mode.
 
@@ -725,10 +851,12 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
         context.run_migrations()
+
 
 def run_migrations_online() -> None:
     '''Run migrations in 'online' mode.
@@ -744,11 +872,16 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+        )
 
         with context.begin_transaction():
             context.run_migrations()
 
+            
 if context.is_offline_mode():
     run_migrations_offline()
 else:
@@ -800,9 +933,11 @@ else:
         print("📦 Installing frontend dependencies...")
         self.run_command("npm install axios", cwd=frontend_path)
 
+        # dev-time tooling
         self.run_command(
             "npm install -D @types/node prettier eslint "
-            "@typescript-eslint/parser @typescript-eslint/eslint-plugin",
+            "@typescript-eslint/parser @typescript-eslint/eslint-plugin "
+            "@supabase/supabase-js @tanstack/react-query @tanstack/react-query-devtools",
             cwd=frontend_path,
         )
 
@@ -842,6 +977,309 @@ else:
             with open(tsconfig_path, "w") as f:
                 json.dump(tsconfig, f, indent=2)
 
+        # ------------------------------------------------------------------
+        # NEW: environment template
+        env_local_example = """NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+"""
+        self.create_file("frontend/.env.local.example", env_local_example)
+
+        # Supabase client
+        supabase_client = """import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);"""
+        self.create_file("frontend/src/lib/supabase.ts", supabase_client)
+
+        # Axios API wrapper
+        api_index = """import axios, { InternalAxiosRequestConfig, AxiosResponse } from "axios";
+import { supabase } from '@/lib/supabase';
+
+const api = axios.create({
+    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+    timeout: 30000,
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+});
+
+// request interceptor to add auth token
+api.interceptors.request.use(
+    async (config: InternalAxiosRequestConfig) => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session?.access_token) {
+                config.headers = config.headers || {};
+                config.headers.Authorization = `Bearer ${session.access_token}`;
+            }
+        } catch (error) {
+            console.error('Error getting auth token:', error);
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
+// response interceptor to handle 401 errors
+api.interceptors.response.use(
+    (response: AxiosResponse) => {
+        return response;
+    },
+    async (error) => {
+        if (error.response?.status === 401) {
+            // token expired or invalid
+            console.log('Token expired, logging out user...');
+            
+            // clear auth data
+            try {
+                await supabase.auth.signOut();
+                localStorage.removeItem('supabase.auth.token');
+                
+                // redirect to login page
+                if (typeof window !== 'undefined') {
+                    window.location.href = '/';
+                }
+            } catch (logoutError) {
+                console.error('Error during logout:', logoutError);
+                // force redirect even if logout fails
+                if (typeof window !== 'undefined') {
+                    window.location.href = '/';
+                }
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+// wrap axios instance with common request types 
+export const apiClient = {
+    get: async <T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> => {
+      const response: AxiosResponse<T> = await api.get(url, { params });
+      return response.data;
+    },
+  
+    post: async <T = unknown>(url: string, data?: unknown): Promise<T> => {
+      const response: AxiosResponse<T> = await api.post(url, data);
+      return response.data;
+    },
+  
+    put: async <T = unknown>(url: string, data?: unknown): Promise<T> => {
+      const response: AxiosResponse<T> = await api.put(url, data);
+      return response.data;
+    },
+  
+    patch: async <T = unknown>(url: string, data?: unknown): Promise<T> => {
+      const response: AxiosResponse<T> = await api.patch(url, data);
+      return response.data;
+    },
+  
+    delete: async <T = unknown>(url: string): Promise<T> => {
+      const response: AxiosResponse<T> = await api.delete(url);
+      return response.data;
+    },
+};"""
+        self.create_file("frontend/src/api/index.ts", api_index)
+
+        # Auth React hook
+        use_auth = """import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+
+interface UseAuthReturn {
+  user: User | null;
+  logout: () => Promise<void>;
+}
+
+export function useAuth(redirectPath: string = '/'): UseAuthReturn {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // get the current session - this validates the token
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error || !session || !session.user) {
+          // no valid session, redirect to login
+          router.push(redirectPath);
+          return;
+        }
+        
+        // check if token is expired
+        const now = Math.floor(Date.now() / 1000);
+        if (session.expires_at && session.expires_at < now) {
+          // token expired, clear and redirect
+          await supabase.auth.signOut();
+          localStorage.removeItem('supabase.auth.token');
+          router.push(redirectPath);
+          return;
+        }
+        
+        // valid session, set user
+        setUser(session.user);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        router.push(redirectPath);
+        // why no return here but returns above?
+      }
+    };
+
+    checkAuth();
+  }, [router, redirectPath]);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('supabase.auth.token');
+    router.push(redirectPath);
+  };
+
+  return { user, logout };
+}"""
+        self.create_file("frontend/src/hooks/useAuth.ts", use_auth)
+
+        # React Query Provider component
+        react_query_provider = """'use client';
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { PropsWithChildren, useState } from 'react';
+
+export default function ReactQueryProvider({ children }: PropsWithChildren) {
+  const [client] = useState(() => new QueryClient());
+  return (
+    <QueryClientProvider client={client}>
+      {children}
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
+    </QueryClientProvider>
+  );
+}"""
+        self.create_file(
+            "frontend/src/components/ReactQueryProvider.tsx", react_query_provider
+        )
+
+        # Update root layout to include provider
+        layout_path = frontend_path / "src" / "app" / "layout.tsx"
+        if layout_path.exists():
+            layout_content = """import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+import ReactQueryProvider from '@/components/ReactQueryProvider';
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: 'Monorepo App',
+  description: 'Generated by create-monorepo',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <ReactQueryProvider>
+          {children}
+        </ReactQueryProvider>
+      </body>
+    </html>
+  );
+}
+"""
+            with open(layout_path, "w") as f:
+                f.write(layout_content)
+
+        # Simple login form component
+        login_form = """'use client';
+
+import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+
+export default function LoginForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const router = useRouter();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message);
+    } else {
+      if (data.session) {
+        localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
+      }
+      router.push('/your-redirect');
+    }
+  };
+
+  return (
+    <div className='min-h-screen flex items-center justify-center bg-gray-100 text-gray-900'>
+      <form onSubmit={handleLogin} className='p-8 bg-white rounded shadow-md border border-gray-200 w-full max-w-sm'>
+        <h2 className='text-2xl mb-4 text-center'>Login</h2>
+        {error && <p className='text-red-500 mb-4'>{error}</p>}
+        <input
+          type='email'
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder='Email'
+          className='mb-4 p-2 border w-full text-gray-900 bg-white'
+          required
+        />
+        <input
+          type='password'
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder='Password'
+          className='mb-4 p-2 border w-full text-gray-900 bg-white'
+          required
+        />
+        <button type='submit' className='bg-blue-600 text-white hover:bg-blue-700 p-2 w-full transition-colors'>
+          Log In
+        </button>
+      </form>
+    </div>
+  );
+}
+"""
+        self.create_file("frontend/src/components/LoginForm.tsx", login_form)
+
+        # Route page that renders the LoginForm component (Next.js App Router)
+        login_page = """import LoginForm from '@/components/LoginForm';
+
+export default function LoginPage() {
+  return <LoginForm />;
+}
+"""
+        self.create_file("frontend/src/app/login/page.tsx", login_page)
+        # ------------------------------------------------------------------
+
     def create_readme(self):
         """Create root README.md"""
         readme_content = f"""# {self.project_name}
@@ -869,6 +1307,7 @@ python -m uvicorn app.main:app --reload --port 8000
 ### Frontend
 ```bash
 cd frontend
+cp .env.local.example .env.local  # create env file and populate values
 npm run dev
 ```
 
