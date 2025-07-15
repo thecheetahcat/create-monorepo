@@ -11,6 +11,29 @@ import subprocess
 import sys
 from pathlib import Path
 
+from backend.alembic_env import ALEMBIC_ENV
+from backend.base import BASE
+from backend.config import CONFIG
+from backend.env_example import ENV_EXAMPLE
+from backend.main import MAIN
+from backend.pyproject import pyproject_toml
+from backend.readme_backend import readme_backend
+from backend.readme_db import README_DB
+from backend.session import SESSION
+from frontend.api_index import API_INDEX
+from frontend.env_local_example import ENV_LOCAL_EXAMPLE
+from frontend.eslint_config import ESLINT_CONFIG
+from frontend.layout_content import LAYOUT_CONTENT
+from frontend.login_form import LOGIN_FORM
+from frontend.login_page import LOGIN_PAGE
+from frontend.prettier_config import PRETTIER_CONFIG
+from frontend.react_query_provider import REACT_QUERY_PROVIDER
+from frontend.supabase_client import SUPABASE_CLIENT
+from frontend.use_auth import USE_AUTH
+from root.gitignore import GITIGNORE
+from root.readme_root import readme_root
+from root.vscode_settings import VSCODE_SETTINGS
+
 
 class MonorepoSetup:
     def __init__(self, project_name, base_path=None):
@@ -117,169 +140,11 @@ class MonorepoSetup:
 
     def create_gitignore(self):
         """Create root .gitignore file"""
-        gitignore_content = """# Common file types to be ignored
-
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-*.egg
-*$py.class
-.Python
-downloads/
-develop-eggs/
-eggs/
-.eggs/
-lib64/
-parts/
-sdist/
-var/
-.installed.cfg
-
-# C extensions
-*.so
-
-# Virtual environments
-.venv
-
-# Environment variables
-.env
-.env.local
-env/
-venv/
-ENV/
-.env.deployment
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# PyInstaller
-# Usually these files are written by a python script from a template
-# before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# IDE files
-.idea/
-*.swp
-*.swo
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Django / Flask locals
-local_settings.py
-db.sqlite3
-instance/
-.webassets-cache
-
-# Cython debug
-cython_debug/
-
-# pip installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Scratch files
-scratch.py
-scratch
-notes
-
-# Windows extensions
-*.pyd
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Other files
-*.csv
-*.png
-*.xlsx
-
-# dependencies
-**/node_modules/
-node_modules
-node_modules/
-/node_modules
-.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-coverage
-
-# next.js
-**/.next/
-.next
-.next/
-/.next
-out/
-
-# misc
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# logs
-logs/
-"""
-        self.create_file(".gitignore", gitignore_content)
+        self.create_file(".gitignore", GITIGNORE)
 
     def create_vscode_settings(self):
         """Create .vscode/settings.json"""
-        vscode_settings = """{
-  "python.defaultInterpreterPath": "./backend/.venv/bin/python",
-  "python.terminal.activateEnvironment": true,
-  "python.linting.enabled": true,
-  "python.linting.ruffEnabled": true,
-  "python.linting.flake8Enabled": false,
-  "python.linting.pylintEnabled": false,
-  "ruff.nativeServer": "on",
-
-  "[python]": {
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll": "explicit",
-      "source.organizeImports": "explicit"
-    },
-    "editor.defaultFormatter": "charliermarsh.ruff"
-  }
-}"""
-        self.create_file(".vscode/settings.json", vscode_settings)
+        self.create_file(".vscode/settings.json", VSCODE_SETTINGS)
 
     def setup_backend(self):
         """Setup backend with UV and Python"""
@@ -304,122 +169,13 @@ logs/
         self.create_file("backend/src/app/__init__.py", "")
 
         # Create main.py with basic FastAPI app
-        main_py_content = '''"""Main application file"""
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI(title="Backend API")
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
-async def root():
-    return {"message": "Hello from backend!"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-'''
-        self.create_file("backend/src/app/main.py", main_py_content)
+        self.create_file("backend/src/app/main.py", MAIN)
 
         # Create pyproject.toml - using 'backend' as the name to match MONOREPO.md
-        pyproject_content = f"""[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "backend"
-version = "0.1.0"
-description = "Backend service for {self.project_name}"
-readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.uv.sources]
-backend = {{ workspace = true }}
-
-[dependency-groups]
-dev = [
-    "backend",
-]"""
-        self.create_file("backend/pyproject.toml", pyproject_content)
+        self.create_file("backend/pyproject.toml", pyproject_toml(self.project_name))
 
         # Create backend README
-        backend_readme = f"""# {self.project_name} Backend
-
-## Overview
-FastAPI backend service for {self.project_name}.
-
-## Setup
-```bash
-# Create and activate virtual environment
-uv venv
-source .venv/bin/activate  # Unix/macOS
-# or
-.venv\\Scripts\\activate  # Windows
-
-# Install dependencies
-uv sync --dev
-```
-
-## Environment variables
-Copy `.env.example` to `.env` and fill in your credentials.
-
-```bash
-cp .env.example .env
-```
-
-## Development
-```bash
-# Run the development server
-python -m uvicorn app.main:app --reload --port 8000
-
-# API will be available at:
-# - http://localhost:8000
-# - http://localhost:8000/docs (Swagger UI)
-# - http://localhost:8000/redoc (ReDoc)
-```
-
-## Project Structure
-```
-backend/
-├── src/
-│   └── app/
-│       ├── core/
-│       │   └── config.py
-│       ├── database/
-│       │   ├── alembic/
-│       │   ├── models/
-│       │   │   └── base.py
-│       │   └── session.py
-│       ├── __init__.py
-│       └── main.py
-├── .env.example
-├── .venv/
-├── pyproject.toml
-└── README.md
-```
-
-## Adding Dependencies
-```bash
-# Production dependencies
-uv add package-name
-
-# Development dependencies
-uv add --dev package-name
-```
-"""
-        self.create_file("backend/README.md", backend_readme)
+        self.create_file("backend/README.md", readme_backend(self.project_name))
 
         # Install dependencies (UV doesn't need venv activation)
         print("📦 Installing backend dependencies...")
@@ -449,81 +205,11 @@ uv add --dev package-name
         core_dir.mkdir(parents=True, exist_ok=True)
         self.create_file("backend/src/app/core/__init__.py", "")
 
-        core_config = """from urllib.parse import quote_plus
-
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from supabase import create_client
-
-
-class Settings(BaseSettings):
-    # supabase
-    DB_USER: str = "postgres"
-    DB_NAME: str = "postgres"
-    DB_PORT: str = "5432"
-    DEV_LOGS: bool = False
-    SUPABASE_DB_PASSWORD: str
-    SUPABASE_PROJECT_ID: str
-
-    # supabase storage
-    SUPABASE_BUCKET: str = "your-bucket-name"
-
-    # supabase auth
-    SUPABASE_URL: str
-    SUPABASE_KEY: str
-    SUPABASE_JWT: str
-
-    @property
-    def supabase_connection_string(self):
-        # normal url encoding (runtime usage)
-        encoded_password = quote_plus(self.SUPABASE_DB_PASSWORD)
-        return (
-            f"postgresql://{self.DB_USER}.{self.SUPABASE_PROJECT_ID}:{encoded_password}"
-            f"@aws-0-us-east-2.pooler.supabase.com:{self.DB_PORT}/{self.DB_NAME}"
-        )
-
-    @property
-    def async_supabase_connection_string(self):
-        return self.supabase_connection_string.replace(
-            "postgresql://", "postgresql+psycopg://"
-        )
-
-    @property
-    def supabase_connection_string_alembic(self):
-        # alembic-compatible connection string with '%%'
-        encoded_password = quote_plus(self.SUPABASE_DB_PASSWORD).replace('%', '%%')
-        return (
-            f"postgresql://{self.DB_USER}.{self.SUPABASE_PROJECT_ID}:{encoded_password}"
-            f"@aws-0-us-east-2.pooler.supabase.com:{self.DB_PORT}/{self.DB_NAME}"
-        )
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        case_sensitive=True,
-    )
-
-
-load_dotenv()
-
-settings = Settings()
-
-sb_client = create_client(
-    settings.SUPABASE_URL,
-    settings.SUPABASE_KEY,
-)
-"""
-        self.create_file("backend/src/app/core/config.py", core_config)
+        self.create_file("backend/src/app/core/config.py", CONFIG)
 
         # --------------------------------------------------
         # Environment example file
-        env_example = """# supabase
-SUPABASE_DB_PASSWORD=your-password
-SUPABASE_PROJECT_ID=your-project-id
-SUPABASE_URL=your-url
-SUPABASE_KEY=your-key
-SUPABASE_JWT=your-jwt
-"""
-        self.create_file("backend/.env.example", env_example)
+        self.create_file("backend/.env.example", ENV_EXAMPLE)
 
         # --------------------------------------------------
         # Database package setup
@@ -538,356 +224,18 @@ SUPABASE_JWT=your-jwt
             'from .base import Base\n\n__all__ = ["Base"]\n',
         )
 
-        base_model = """from sqlalchemy import inspect
-from sqlalchemy.orm import DeclarativeBase
+        self.create_file("backend/src/app/database/models/base.py", BASE)
 
+        self.create_file("backend/src/app/database/session.py", SESSION)
 
-class Mixins:
-    def to_dict(self):
-        mapper = inspect(self).mapper
-        return {attr.key: getattr(self, attr.key) for attr in mapper.column_attrs}
-
-
-class Base(Mixins, DeclarativeBase):
-    pass
-"""
-        self.create_file("backend/src/app/database/models/base.py", base_model)
-
-        session_py = """import asyncio
-import functools
-import logging
-from contextlib import asynccontextmanager, contextmanager
-from typing import Any, AsyncGenerator, Generator
-
-from sqlalchemy import create_engine
-from sqlalchemy.exc import DisconnectionError, OperationalError
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.core.config import settings
-
-logger = logging.getLogger(__name__)
-
-
-# connection pool configuration
-CONNECTION_POOL_CONFIG = {
-    "echo": settings.DEV_LOGS,
-    "pool_size": 10,
-    "max_overflow": 20,
-    "pool_timeout": 30,
-    "pool_recycle": 3600,
-    "pool_pre_ping": True,
-}
-
-# synchronous session
-engine = create_engine(settings.supabase_connection_string, **CONNECTION_POOL_CONFIG)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# asynchronous session
-async_engine = create_async_engine(
-    settings.async_supabase_connection_string, **CONNECTION_POOL_CONFIG
-)
-AsyncSessionLocal = sessionmaker(
-    bind=async_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-
-def retry_db_operation(max_retries: int = 3, delay: float = 1.0):
-    '''
-    Decorator to retry database operations on connection failures.
-
-    Args:
-        max_retries: Maximum number of retry attempts
-        delay: Delay between retries in seconds
-    '''
-
-    def decorator(func):
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            last_exception = None
-
-            for attempt in range(max_retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except (OperationalError, DisconnectionError) as e:
-                    last_exception = e
-                    error_msg = str(e).lower()
-
-                    # check if it's a connection-related error
-                    if any(
-                        phrase in error_msg
-                        for phrase in [
-                            "server closed the connection",
-                            "connection closed",
-                            "connection was closed",
-                            "connection terminated",
-                            "connection lost",
-                            "connection reset",
-                        ]
-                    ):
-                        if attempt < max_retries:
-                            logger.warning(
-                                f"Database connection failed (attempt {attempt + 1}/{max_retries + 1}): {e}"
-                            )
-                            await asyncio.sleep(
-                                delay * (attempt + 1)
-                            )  # exponential backoff
-                            continue
-
-                    # for non-connection errors or max retries reached
-                    raise
-                except Exception:
-                    # for non-connection exceptions, don't retry
-                    raise
-
-            # if we get here, all retries failed
-            raise last_exception
-
-        return wrapper
-
-    return decorator
-
-
-@contextmanager
-def get_session() -> Generator[Any, Any, Any]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@asynccontextmanager
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as adb:
-        try:
-            yield adb
-        finally:
-            await adb.close()
-
-
-async def get_async_session_dep() -> AsyncGenerator[AsyncSession, None]:
-    '''
-    FastAPI dependency for async database session.
-
-    Usage:
-        @router.get("/endpoint")
-        async def my_endpoint(session: AsyncSession = Depends(get_async_session_dep)):
-            # Use session here
-            pass
-    '''
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        except Exception as e:
-            logger.error(f"Database session error: {e}")
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
-
-
-class BaseSession:
-    def __init__(self):
-        self.session = None
-        self._session = None
-
-    def __enter__(self):
-        self._session = get_session()
-        self.session = self._session.__enter__()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type:
-            # log or handle the exception here
-            pass
-        else:
-            self.session.commit()
-        self.session.close()
-        return self._session_cm.__exit__(exc_type, exc_val, exc_tb)
-"""
-        self.create_file("backend/src/app/database/session.py", session_py)
-
-        db_readme = """# Database & Migrations Guide
-
-This directory ships **ready-to-use** tooling for working with a Postgres (Supabase) database via SQLAlchemy & Alembic.
-
-## What you already have
-
-```
-database/
-├── alembic/            # Alembic already initialised for versioned migrations
-│   ├── env.py          # pre-configured to use our Settings + Base metadata
-│   └── versions/       # (empty) place where revision files will be generated
-├── models/
-│   └── base.py         # Declarative SQLAlchemy Base (+ to_dict mixin)
-├── session.py          # Sync & Async session helpers bound to Supabase
-└── README.md           # (this file)
-```
-
-## First-time setup
-
-1. `cd backend && source .venv/bin/activate`
-2. Ensure `.env` contains valid Supabase credentials (see `.env.example`).
-3. Upgrade dependencies if you add new DB libraries: `uv sync --dev`.
-
-## Creating migrations
-
-```bash
-# Navigate into the database directory so Alembic picks up the right ini file
-cd src/app/database
-
-# Generate a new migration with autogenerate
-alembic revision --autogenerate -m "create users table"
-
-# OR start a blank migration
-alembic revision -m "custom changes"
-```
-
-Alembic will compare the models imported via `Base.metadata` (all models that subclass `Base`) against the current DB schema and emit the SQL needed.
-
-## Applying / rolling migrations
-
-```bash
-# Upgrade to the latest version
-alembic upgrade head
-
-# Downgrade one revision
-alembic downgrade -1
-```
-
-## Tips
-
-* The engine & session are configured in `session.py`; adjust logging or isolation as needed.
-* Use the **async** helpers for async frameworks (e.g. FastAPI) and the sync helpers for scripts.
-* If autogenerate misses changes, check that your new model modules are imported somewhere before Alembic runs (e.g. inside `database/models/__init__.py`).
-"""
-        self.create_file("backend/src/app/database/README.md", db_readme)
+        self.create_file("backend/src/app/database/README.md", README_DB)
 
         # --------------------------------------------------
         # Alembic initialization and configuration
         alembic_exe = backend_path / ".venv" / "bin" / "alembic"
         self.run_command(f"{alembic_exe} init alembic", cwd=db_dir)
 
-        alembic_env = """from logging.config import fileConfig
-
-from alembic import context
-from app.core.config import settings
-from app.database.models.base import Base
-from sqlalchemy import engine_from_config, pool
-
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
-config = context.config
-
-# Override the sqlalchemy.url setting with an environment variable value
-DATABASE_URL = settings.supabase_connection_string_alembic
-
-if DATABASE_URL:
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-else:
-    raise Exception("DATABASE_URL environment variable is not set.")
-
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = Base.metadata
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
-
-def include_object(object, name, type_, reflected, compare_to):
-    '''Filter function to exclude certain tables from Alembic migrations.
-
-    This excludes Supabase-managed tables that we don't want to manage
-    with our SQLAlchemy models.
-
-    '''
-    # Tables to exclude from migrations (Supabase managed)
-    excluded_tables = {
-        "profiles",  # Supabase user profiles
-        # Add other Supabase tables here if needed
-    }
-
-    # Exclude tables in the 'auth' schema (Supabase auth tables)
-    if type_ == "table" and hasattr(object, "schema"):
-        if object.schema == "auth":
-            return False
-
-    # Exclude specific tables by name
-    if type_ == "table" and name in excluded_tables:
-        return False
-
-    # Include everything else
-    return True
-
-
-def run_migrations_offline() -> None:
-    '''Run migrations in 'offline' mode.
-
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
-    '''
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-        include_object=include_object,
-    )
-
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def run_migrations_online() -> None:
-    '''Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    '''
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            include_object=include_object,
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
-
-            
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
-"""
-        self.create_file("backend/src/app/database/alembic/env.py", alembic_env)
+        self.create_file("backend/src/app/database/alembic/env.py", ALEMBIC_ENV)
 
     def setup_frontend(self):
         """Setup frontend with Next.js"""
@@ -942,25 +290,8 @@ else:
         )
 
         # Create configuration files
-        prettier_config = """{
-  "semi": true,
-  "trailingComma": "es5",
-  "singleQuote": true,
-  "tabWidth": 2,
-  "printWidth": 80
-}"""
-        self.create_file("frontend/.prettierrc", prettier_config)
-
-        eslint_config = """{
-  "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
-  "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint"],
-  "rules": {
-    "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/no-explicit-any": "warn"
-  }
-}"""
-        self.create_file("frontend/.eslintrc.json", eslint_config)
+        self.create_file("frontend/.prettierrc", PRETTIER_CONFIG)
+        self.create_file("frontend/.eslintrc.json", ESLINT_CONFIG)
 
         # Update tsconfig.json to add forceConsistentCasingInFileNames
         tsconfig_path = frontend_path / "tsconfig.json"
@@ -978,368 +309,39 @@ else:
                 json.dump(tsconfig, f, indent=2)
 
         # ------------------------------------------------------------------
-        # NEW: environment template
-        env_local_example = """NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-"""
-        self.create_file("frontend/.env.local.example", env_local_example)
+        # Environment template
+        self.create_file("frontend/.env.local.example", ENV_LOCAL_EXAMPLE)
 
         # Supabase client
-        supabase_client = """import { createClient } from '@supabase/supabase-js';
-
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);"""
-        self.create_file("frontend/src/lib/supabase.ts", supabase_client)
+        self.create_file("frontend/src/lib/supabase.ts", SUPABASE_CLIENT)
 
         # Axios API wrapper
-        api_index = """import axios, { InternalAxiosRequestConfig, AxiosResponse } from "axios";
-import { supabase } from '@/lib/supabase';
-
-const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
-    timeout: 30000,
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
-});
-
-// request interceptor to add auth token
-api.interceptors.request.use(
-    async (config: InternalAxiosRequestConfig) => {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (session?.access_token) {
-                config.headers = config.headers || {};
-                config.headers.Authorization = `Bearer ${session.access_token}`;
-            }
-        } catch (error) {
-            console.error('Error getting auth token:', error);
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
-
-// response interceptor to handle 401 errors
-api.interceptors.response.use(
-    (response: AxiosResponse) => {
-        return response;
-    },
-    async (error) => {
-        if (error.response?.status === 401) {
-            // token expired or invalid
-            console.log('Token expired, logging out user...');
-            
-            // clear auth data
-            try {
-                await supabase.auth.signOut();
-                localStorage.removeItem('supabase.auth.token');
-                
-                // redirect to login page
-                if (typeof window !== 'undefined') {
-                    window.location.href = '/';
-                }
-            } catch (logoutError) {
-                console.error('Error during logout:', logoutError);
-                // force redirect even if logout fails
-                if (typeof window !== 'undefined') {
-                    window.location.href = '/';
-                }
-            }
-        }
-        return Promise.reject(error);
-    }
-);
-
-// wrap axios instance with common request types 
-export const apiClient = {
-    get: async <T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> => {
-      const response: AxiosResponse<T> = await api.get(url, { params });
-      return response.data;
-    },
-  
-    post: async <T = unknown>(url: string, data?: unknown): Promise<T> => {
-      const response: AxiosResponse<T> = await api.post(url, data);
-      return response.data;
-    },
-  
-    put: async <T = unknown>(url: string, data?: unknown): Promise<T> => {
-      const response: AxiosResponse<T> = await api.put(url, data);
-      return response.data;
-    },
-  
-    patch: async <T = unknown>(url: string, data?: unknown): Promise<T> => {
-      const response: AxiosResponse<T> = await api.patch(url, data);
-      return response.data;
-    },
-  
-    delete: async <T = unknown>(url: string): Promise<T> => {
-      const response: AxiosResponse<T> = await api.delete(url);
-      return response.data;
-    },
-};"""
-        self.create_file("frontend/src/api/index.ts", api_index)
+        self.create_file("frontend/src/api/index.ts", API_INDEX)
 
         # Auth React hook
-        use_auth = """import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-
-interface UseAuthReturn {
-  user: User | null;
-  logout: () => Promise<void>;
-}
-
-export function useAuth(redirectPath: string = '/'): UseAuthReturn {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // get the current session - this validates the token
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error || !session || !session.user) {
-          // no valid session, redirect to login
-          router.push(redirectPath);
-          return;
-        }
-        
-        // check if token is expired
-        const now = Math.floor(Date.now() / 1000);
-        if (session.expires_at && session.expires_at < now) {
-          // token expired, clear and redirect
-          await supabase.auth.signOut();
-          localStorage.removeItem('supabase.auth.token');
-          router.push(redirectPath);
-          return;
-        }
-        
-        // valid session, set user
-        setUser(session.user);
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        router.push(redirectPath);
-        // why no return here but returns above?
-      }
-    };
-
-    checkAuth();
-  }, [router, redirectPath]);
-
-  const logout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('supabase.auth.token');
-    router.push(redirectPath);
-  };
-
-  return { user, logout };
-}"""
-        self.create_file("frontend/src/hooks/useAuth.ts", use_auth)
+        self.create_file("frontend/src/hooks/useAuth.ts", USE_AUTH)
 
         # React Query Provider component
-        react_query_provider = """'use client';
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { PropsWithChildren, useState } from 'react';
-
-export default function ReactQueryProvider({ children }: PropsWithChildren) {
-  const [client] = useState(() => new QueryClient());
-  return (
-    <QueryClientProvider client={client}>
-      {children}
-      {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools initialIsOpen={false} />
-      )}
-    </QueryClientProvider>
-  );
-}"""
         self.create_file(
-            "frontend/src/components/ReactQueryProvider.tsx", react_query_provider
+            "frontend/src/components/ReactQueryProvider.tsx", REACT_QUERY_PROVIDER
         )
 
         # Update root layout to include provider
         layout_path = frontend_path / "src" / "app" / "layout.tsx"
         if layout_path.exists():
-            layout_content = """import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-import ReactQueryProvider from '@/components/ReactQueryProvider';
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: 'Monorepo App',
-  description: 'Generated by create-monorepo',
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <ReactQueryProvider>
-          {children}
-        </ReactQueryProvider>
-      </body>
-    </html>
-  );
-}
-"""
             with open(layout_path, "w") as f:
-                f.write(layout_content)
+                f.write(LAYOUT_CONTENT)
 
         # Simple login form component
-        login_form = """'use client';
-
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
-
-export default function LoginForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const router = useRouter();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
-    } else {
-      if (data.session) {
-        localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
-      }
-      router.push('/your-redirect');
-    }
-  };
-
-  return (
-    <div className='min-h-screen flex items-center justify-center bg-gray-100 text-gray-900'>
-      <form onSubmit={handleLogin} className='p-8 bg-white rounded shadow-md border border-gray-200 w-full max-w-sm'>
-        <h2 className='text-2xl mb-4 text-center'>Login</h2>
-        {error && <p className='text-red-500 mb-4'>{error}</p>}
-        <input
-          type='email'
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder='Email'
-          className='mb-4 p-2 border w-full text-gray-900 bg-white'
-          required
-        />
-        <input
-          type='password'
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder='Password'
-          className='mb-4 p-2 border w-full text-gray-900 bg-white'
-          required
-        />
-        <button type='submit' className='bg-blue-600 text-white hover:bg-blue-700 p-2 w-full transition-colors'>
-          Log In
-        </button>
-      </form>
-    </div>
-  );
-}
-"""
-        self.create_file("frontend/src/components/LoginForm.tsx", login_form)
+        self.create_file("frontend/src/components/LoginForm.tsx", LOGIN_FORM)
 
         # Route page that renders the LoginForm component (Next.js App Router)
-        login_page = """import LoginForm from '@/components/LoginForm';
-
-export default function LoginPage() {
-  return <LoginForm />;
-}
-"""
-        self.create_file("frontend/src/app/login/page.tsx", login_page)
+        self.create_file("frontend/src/app/login/page.tsx", LOGIN_PAGE)
         # ------------------------------------------------------------------
 
     def create_readme(self):
         """Create root README.md"""
-        readme_content = f"""# {self.project_name}
-
-## Structure
-- [Backend](backend/README.md) - Python backend service (FastAPI)
-- [Frontend](frontend/README.md) - Frontend application (Next.js/React)
-
-## Getting Started
-
-### Prerequisites
-- Python 3.13+
-- Node.js 18+
-- UV (https://github.com/astral-sh/uv)
-
-### Backend
-```bash
-cd backend
-source .venv/bin/activate  # Unix/macOS
-# or
-.venv\\Scripts\\activate  # Windows
-python -m uvicorn app.main:app --reload --port 8000
-```
-
-### Frontend
-```bash
-cd frontend
-cp .env.local.example .env.local  # create env file and populate values
-npm run dev
-```
-
-## Development
-
-### Add Backend Dependencies
-```bash
-cd backend && source .venv/bin/activate
-uv add package-name              # Production
-uv add --dev package-name        # Development
-```
-
-### Add Frontend Dependencies
-```bash
-cd frontend
-npm install package-name         # Production
-npm install -D package-name      # Development
-```
-
-### Create git repository
-```bash
-`gh auth switch`  # switch the right account
-git config user.name "your-user-name"
-git config user.email "your-email"
-git add .
-git commit -m "initial commit"
-gh repo create repo-name --public/private  # public or private
-git remote add origin git@host:user-name/repo-name.git
-git push -u origin master
-```
-"""
-        self.create_file("README.md", readme_content)
+        self.create_file("README.md", readme_root(self.project_name))
 
 
 def main():
