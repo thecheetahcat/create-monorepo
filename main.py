@@ -11,28 +11,28 @@ import subprocess
 import sys
 from pathlib import Path
 
-from templates.backend.alembic_env import ALEMBIC_ENV
-from templates.backend.base import BASE
-from templates.backend.config import CONFIG
-from templates.backend.env_example import ENV_EXAMPLE
-from templates.backend.main import MAIN
-from templates.backend.pyproject import pyproject_toml
-from templates.backend.readme_backend import readme_backend
-from templates.backend.readme_db import README_DB
-from templates.backend.session import SESSION
-from templates.frontend.api_index import API_INDEX
-from templates.frontend.env_local_example import ENV_LOCAL_EXAMPLE
-from templates.frontend.eslint_config import ESLINT_CONFIG
-from templates.frontend.layout_content import LAYOUT_CONTENT
-from templates.frontend.login_form import LOGIN_FORM
-from templates.frontend.login_page import LOGIN_PAGE
-from templates.frontend.prettier_config import PRETTIER_CONFIG
-from templates.frontend.react_query_provider import REACT_QUERY_PROVIDER
-from templates.frontend.supabase_client import SUPABASE_CLIENT
-from templates.frontend.use_auth import USE_AUTH
-from templates.root.gitignore import GITIGNORE
-from templates.root.readme_root import readme_root
-from templates.root.vscode_settings import VSCODE_SETTINGS
+from .templates.backend.alembic_env import ALEMBIC_ENV
+from .templates.backend.base import BASE
+from .templates.backend.config import CONFIG
+from .templates.backend.env_example import ENV_EXAMPLE
+from .templates.backend.main import MAIN
+from .templates.backend.pyproject import pyproject_toml
+from .templates.backend.readme_backend import readme_backend
+from .templates.backend.readme_db import README_DB
+from .templates.backend.session import SESSION
+from .templates.frontend.api_index import API_INDEX
+from .templates.frontend.env_local_example import ENV_LOCAL_EXAMPLE
+from .templates.frontend.eslint_config import ESLINT_CONFIG
+from .templates.frontend.layout_content import LAYOUT_CONTENT
+from .templates.frontend.login_form import LOGIN_FORM
+from .templates.frontend.login_page import LOGIN_PAGE
+from .templates.frontend.prettier_config import PRETTIER_CONFIG
+from .templates.frontend.react_query_provider import REACT_QUERY_PROVIDER
+from .templates.frontend.supabase_client import SUPABASE_CLIENT
+from .templates.frontend.use_auth import USE_AUTH
+from .templates.root.gitignore import GITIGNORE
+from .templates.root.readme_root import readme_root
+from .templates.root.vscode_settings import VSCODE_SETTINGS
 
 
 class MonorepoSetup:
