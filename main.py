@@ -11,28 +11,28 @@ import subprocess
 import sys
 from pathlib import Path
 
-from backend.alembic_env import ALEMBIC_ENV
-from backend.base import BASE
-from backend.config import CONFIG
-from backend.env_example import ENV_EXAMPLE
-from backend.main import MAIN
-from backend.pyproject import pyproject_toml
-from backend.readme_backend import readme_backend
-from backend.readme_db import README_DB
-from backend.session import SESSION
-from frontend.api_index import API_INDEX
-from frontend.env_local_example import ENV_LOCAL_EXAMPLE
-from frontend.eslint_config import ESLINT_CONFIG
-from frontend.layout_content import LAYOUT_CONTENT
-from frontend.login_form import LOGIN_FORM
-from frontend.login_page import LOGIN_PAGE
-from frontend.prettier_config import PRETTIER_CONFIG
-from frontend.react_query_provider import REACT_QUERY_PROVIDER
-from frontend.supabase_client import SUPABASE_CLIENT
-from frontend.use_auth import USE_AUTH
-from root.gitignore import GITIGNORE
-from root.readme_root import readme_root
-from root.vscode_settings import VSCODE_SETTINGS
+from backend_templates.alembic_env import ALEMBIC_ENV
+from backend_templates.base import BASE
+from backend_templates.config import CONFIG
+from backend_templates.env_example import ENV_EXAMPLE
+from backend_templates.main import MAIN
+from backend_templates.pyproject import pyproject_toml
+from backend_templates.readme_backend import readme_backend
+from backend_templates.readme_db import README_DB
+from backend_templates.session import SESSION
+from frontend_templates.api_index import API_INDEX
+from frontend_templates.env_local_example import ENV_LOCAL_EXAMPLE
+from frontend_templates.eslint_config import ESLINT_CONFIG
+from frontend_templates.layout_content import LAYOUT_CONTENT
+from frontend_templates.login_form import LOGIN_FORM
+from frontend_templates.login_page import LOGIN_PAGE
+from frontend_templates.prettier_config import PRETTIER_CONFIG
+from frontend_templates.react_query_provider import REACT_QUERY_PROVIDER
+from frontend_templates.supabase_client import SUPABASE_CLIENT
+from frontend_templates.use_auth import USE_AUTH
+from root_templates.gitignore import GITIGNORE
+from root_templates.readme_root import readme_root
+from root_templates.vscode_settings import VSCODE_SETTINGS
 
 
 class MonorepoSetup:
