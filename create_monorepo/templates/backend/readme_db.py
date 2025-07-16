@@ -21,6 +21,28 @@ database/
 2. Ensure `.env` contains valid Supabase credentials (see `.env.example`).
 3. Upgrade dependencies if you add new DB libraries: `uv sync --dev`.
 
+## Connection Modes (Session vs. Transaction)
+
+Your database connection can operate in one of two Supabase pooler modes, configured via the `DB_PORT` environment variable in `.env` (or `config.py`).
+The `session.py` file automatically adjusts pooling based on this setting.
+
+- **Session Mode (DB_PORT="5432")**:  
+  Default mode, ideal for applications with long-lived connections (e.g., scripts, CLIs, or low-traffic apps). 
+  It uses client-side pooling in SQLAlchemy for efficiency but has lower concurrency limits (typically 15–20 simultaneous connections on Supabase Pro plans). 
+  Use this if your app doesn't expect high traffic or many parallel requests.
+
+- **Transaction Mode (DB_PORT="6543")**:  
+  Recommended for high-concurrency, serverless apps (e.g., FastAPI web services with many users or background tasks). It disables client-side pooling 
+  (using `NullPool`) and relies on Supabase's server-side pooler for short-lived transactions, supporting hundreds of concurrent connections (e.g., 200–500+ on Pro plans). 
+  Switch to this if you hit "max clients reached" errors or need scalability. 
+  Note: It may not support session-level features like prepared statements, so test migrations and queries.
+
+To switch modes:  
+- Set `DB_PORT="6543"` in `.env` for transaction mode (or `"5432"` for session).  
+- Restart your app and monitor Supabase Reports (Database > Reports > Connections) for usage. 
+If using Alembic, transaction mode works for most migrations but may require temporary switches for complex ones.
+
+
 ## Creating migrations
 
 ```bash
