@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .templates.backend.alembic_env import ALEMBIC_ENV
 from .templates.backend.base import BASE
+from .templates.backend.bucket import BUCKET
 from .templates.backend.config import CONFIG
 from .templates.backend.env_example import ENV_EXAMPLE
 from .templates.backend.main import MAIN
@@ -169,7 +170,8 @@ class MonorepoSetup:
         self.create_file("backend/src/app/__init__.py", "")
 
         # Create main.py with basic FastAPI app
-        self.create_file("backend/src/app/main.py", MAIN)
+        self.create_file("backend/src/app/api/__init__.py", "")
+        self.create_file("backend/src/app/api/main.py", MAIN)
 
         # Create pyproject.toml - using 'backend' as the name to match MONOREPO.md
         self.create_file("backend/pyproject.toml", pyproject_toml(self.project_name))
@@ -227,6 +229,8 @@ class MonorepoSetup:
         self.create_file("backend/src/app/database/models/base.py", BASE)
 
         self.create_file("backend/src/app/database/session.py", SESSION)
+
+        self.create_file("backend/src/app/database/bucket.py", BUCKET)
 
         self.create_file("backend/src/app/database/README.md", README_DB)
 

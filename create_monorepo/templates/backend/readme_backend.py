@@ -26,7 +26,10 @@ cp .env.example .env
 ## Development
 ```bash
 # Run the development server
-python -m uvicorn app.main:app --reload --port 8000
+uv run uvicorn src.app.api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Run the server in production
+uv run uvicorn src.app.api.main:app --host 0.0.0.0 --port 8000
 
 # API will be available at:
 # - http://localhost:8000

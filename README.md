@@ -26,7 +26,7 @@ Make sure `uv`, `npm`, and `git` are on your **PATH**.
 
 ### 1. Development / editable (inside repo)
 ```bash
-git clone https://github.com/your-name/create-monorepo.git
+git clone https://github.com/thecheetahcat/create-monorepo.git
 cd create-monorepo
 pip install -e .
 ```
@@ -36,7 +36,7 @@ pip install -e .
 # once:
 pipx install ./create-monorepo     # from local clone
 # or directly from GitHub:
-pipx install git+https://github.com/your-name/create-monorepo.git
+pipx install git+https://github.com/thecheetahcat/create-monorepo.git
 ```
 After either method you get a global command:
 ```bash
