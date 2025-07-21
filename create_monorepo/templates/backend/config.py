@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     @property
     def async_supabase_connection_string(self):
         return self.supabase_connection_string.replace(
-            "postgresql://", "postgresql+psycopg://"
+            "postgresql://", "postgresql+asyncpg://"
         )
 
     @property

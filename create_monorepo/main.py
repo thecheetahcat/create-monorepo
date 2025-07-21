@@ -194,7 +194,7 @@ class MonorepoSetup:
         # --------------------------------------------------
         # Add backend dependencies (FastAPI and uvicorn, DB, migrations, env management)
         self.run_command(
-            "uv add fastapi uvicorn alembic sqlalchemy psycopg psycopg2 pydantic-settings python-dotenv supabase",
+            "uv add fastapi uvicorn alembic sqlalchemy psycopg psycopg2 asyncpg greenlet pydantic-settings python-dotenv supabase",
             cwd=backend_path,
         )
 

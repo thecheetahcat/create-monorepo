@@ -50,10 +50,10 @@ If using Alembic, transaction mode works for most migrations but may require tem
 cd src/app/database
 
 # Generate a new migration with autogenerate
-alembic revision --autogenerate -m "create users table"
+uv run alembic revision --autogenerate -m "create users table"
 
 # OR start a blank migration
-alembic revision -m "custom changes"
+uv run alembic revision -m "custom changes"
 ```
 
 Alembic will compare the models imported via `Base.metadata` (all models that subclass `Base`) against the current DB schema and emit the SQL needed.
@@ -62,10 +62,10 @@ Alembic will compare the models imported via `Base.metadata` (all models that su
 
 ```bash
 # Upgrade to the latest version
-alembic upgrade head
+uv run alembic upgrade head
 
 # Downgrade one revision
-alembic downgrade -1
+uv run alembic downgrade -1
 ```
 
 ## Tips
