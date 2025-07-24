@@ -15,8 +15,11 @@ from .templates.backend.alembic_env import ALEMBIC_ENV
 from .templates.backend.base import BASE
 from .templates.backend.bucket import BUCKET
 from .templates.backend.config import CONFIG
+from .templates.backend.db_init import INIT
 from .templates.backend.env_example import ENV_EXAMPLE
 from .templates.backend.main import MAIN
+from .templates.backend.profile_router import PROFILE_ROUTER
+from .templates.backend.profiles_model import PROFILES_MODEL
 from .templates.backend.pyproject import pyproject_toml
 from .templates.backend.readme_backend import readme_backend
 from .templates.backend.readme_db import README_DB
@@ -28,6 +31,8 @@ from .templates.frontend.layout_content import LAYOUT_CONTENT
 from .templates.frontend.login_form import LOGIN_FORM
 from .templates.frontend.login_page import LOGIN_PAGE
 from .templates.frontend.prettier_config import PRETTIER_CONFIG
+from .templates.frontend.profiles_fe_api import PROFILES_FE_API
+from .templates.frontend.profiles_fe_api_types import PROFILES_FE_API_TYPES
 from .templates.frontend.react_query_provider import REACT_QUERY_PROVIDER
 from .templates.frontend.supabase_client import SUPABASE_CLIENT
 from .templates.frontend.use_auth import USE_AUTH
@@ -172,6 +177,8 @@ class MonorepoSetup:
         # Create main.py with basic FastAPI app
         self.create_file("backend/src/app/api/__init__.py", "")
         self.create_file("backend/src/app/api/main.py", MAIN)
+        self.create_file("backend/src/app/api/routers/__init__.py", "")
+        self.create_file("backend/src/app/api/routers/profiles.py", PROFILE_ROUTER)
 
         # Create pyproject.toml - using 'backend' as the name to match MONOREPO.md
         self.create_file("backend/pyproject.toml", pyproject_toml(self.project_name))
@@ -221,12 +228,11 @@ class MonorepoSetup:
 
         self.create_file("backend/src/app/database/__init__.py", "")
 
-        self.create_file(
-            "backend/src/app/database/models/__init__.py",
-            'from .base import Base\n\n__all__ = ["Base"]\n',
-        )
+        self.create_file("backend/src/app/database/models/__init__.py", INIT)
 
         self.create_file("backend/src/app/database/models/base.py", BASE)
+
+        self.create_file("backend/src/app/database/models/profiles.py", PROFILES_MODEL)
 
         self.create_file("backend/src/app/database/session.py", SESSION)
 
@@ -321,6 +327,12 @@ class MonorepoSetup:
 
         # Axios API wrapper
         self.create_file("frontend/src/api/index.ts", API_INDEX)
+
+        # Profiles FE API
+        self.create_file("frontend/src/api/profiles/profileApi.ts", PROFILES_FE_API)
+        self.create_file(
+            "frontend/src/api/profiles/profileApiTypes.ts", PROFILES_FE_API_TYPES
+        )
 
         # Auth React hook
         self.create_file("frontend/src/hooks/useAuth.ts", USE_AUTH)
